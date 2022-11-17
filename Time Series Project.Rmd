@@ -15,8 +15,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(R.matlab)
 library(depmixS4)
-library(ggplot2)
-library(plot.matrix)
 ```
 
 ```{r}
@@ -105,21 +103,59 @@ AIC(fit5)
 # States for all time intervals
 states = posterior(fit5)$state
 # Indices for which state is 1
+numstates <- 5
+
 idx_state1 <- which(states == 1)
 idx_state2 <- which(states == 2)
 idx_state3 <- which(states == 3)
 idx_state4 <- which(states == 4)
 idx_state5 <- which(states == 5)
+idx_state <- list(idx_state1)
+
+for (i in 2:numstates){
+  cur_idx <- which(states == i)
+  idx_state <- c(idx_state, list(cur_idx))
+}
+
 ```
+
+```{r}
+statevar <- rep(0,numstates)
+for (i in 1:numstates){
+  statevar[i] <-var(angdata[idx_state[[i]]], na.rm = TRUE)
+}
+print(statevar)
+max_var_state <- which.max(statevar)
+```
+
+
 ```{r}
 #Avrege for of  
-avg_state1 <- mean(angdata[idx_state1], na.rm = TRUE)
-avg_state2 <- mean(angdata[idx_state2], na.rm = TRUE)
-avg_state3 <- mean(angdata[idx_state3], na.rm = TRUE)
-avg_state4 <- mean(angdata[idx_state4], na.rm = TRUE)
-avg_state5 <- mean(angdata[idx_state5], na.rm = TRUE)
-avg <- c(avg_state1, avg_state2, avg_state3, avg_state4, avg_state5)
+
+mean_ang_state = rep(0, numstates)
+for (i in 1:numstates){
+  mean_ang_state[i] <- mean(angdata[idx_state[[i]]], na.rm = TRUE)
+}
+
+print(mean_ang_state)
 ```
+
+
+```{r}
+unsorted_states <- c(1:numstates)
+unsorted_states <- unsorted_states[!unsorted_states == max_var_state]
+sorted_states <- max_var_state
+
+for (i in 2:numstates){
+  cur_min <- which.min(mean_ang_state[unsorted_states])
+  sorted_states <- c(sorted_states, unsorted_states[cur_min])
+  unsorted_states <- unsorted_states[-cur_min]
+}
+
+print(sorted_states)
+
+```
+
 
 
 ### Histogram over head direction for each state
@@ -153,13 +189,12 @@ text(angdata[s], col = 6*states[s], labels = states[s], cex=.9)
 ```{r}
 
 ## Plot of mean head
-avg
-plot(avg, type="h")
+mean_ang_state
+plot(mean_ang_state, type="h")
 ```
 
 
 ```{r}
-sum5 <- summary(fit5)
 
 transmatrix <- matrix(nrow = 5,ncol = 5)
 for (i in 1:5){
@@ -167,13 +202,8 @@ for (i in 1:5){
 }
 
 transmatrix
-#heatmap(t(transmatrix)[,nrow(transmatrix):1],Colv = NA, Rowv = NA)
-#plot(transmatrix)
-heatmap(transmatrix, Colv = NA, Rowv = NA, revC = TRUE)
-
-round(transmatrix,3)
+heatmap(transmatrix[sorted_states,sorted_states], Colv = NA, Rowv = NA, revC = TRUE)
 
 
 ```
-
 
