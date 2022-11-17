@@ -15,6 +15,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(R.matlab)
 library(depmixS4)
+library(ggplot2)
+library(plot.matrix)
 ```
 
 ```{r}
@@ -156,5 +158,22 @@ plot(avg, type="h")
 ```
 
 
+```{r}
+sum5 <- summary(fit5)
+
+transmatrix <- matrix(nrow = 5,ncol = 5)
+for (i in 1:5){
+  transmatrix[i,]<- fit5@transition[[i]]@parameters$coefficients
+}
+
+transmatrix
+#heatmap(t(transmatrix)[,nrow(transmatrix):1],Colv = NA, Rowv = NA)
+#plot(transmatrix)
+heatmap(transmatrix, Colv = NA, Rowv = NA, revC = TRUE)
+
+round(transmatrix,3)
+
+
+```
 
 
