@@ -19,7 +19,7 @@ library(plot.matrix)
 ## Read the cell data
 
 ```{r}
-data <- readMat("~/Documents/Tidsrekker/Prosjekt/Mouse28-140313_BS0150_HMMready.mat")
+data <- readMat("Mouse28-140313_BS0150_HMMready.mat")
 angdata <- as.vector(data$resampledAwakeHeadAngleData)
 # Transpose thet data so that there are 71 columns, one column for each cell, and 15243 rows, one for each time interval.
 celldata <- t(data$celldata)
@@ -48,6 +48,19 @@ for (i in 1:n_cells) {
   families[[i]] = poisson()
 }
 ```
+
+### Add noise to celldata
+
+```{r}
+#for (i in 1:n_cells){
+#  cell_data[[i]] <- jitter(cell_data[[i]])
+#  cell_data[[i]][cell_data[[i]] < 0] <- 0
+#  cell_data[[i]] <- round(cell_data[[i]],0)
+#}
+#cell_data
+```
+
+
 
 ### Model selection 
 
@@ -90,9 +103,14 @@ AIC(fit9)
 
 ### Choose the model with lowest AIC
 
+
 ```{r}
 numstates = 9
-final_fit = fit9
+```
+
+```{r}
+final_model <- depmix(response = res, nstates = numstates, data= cell_data, family = families)
+final_fit <- fit(final_model)
 ```
 
 
@@ -148,15 +166,15 @@ print(sorted_states)
 ```{r}
 idx <- as.vector(sapply(ang_state, length))
 ang = unlist(ang_state)
-states = c()
+plot_states = c()
 for (i in 1:length(idx)) {
-  states = c(states, rep(i, idx[i]))
+  plot_states = c(plot_states, rep(i, idx[i]))
 }
-plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(states))
+plot_data = data.frame(ang = ang, x=1:length(ang), plot_states=as.factor(plot_states))
 ```
 
 ```{r}
-ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = states))
+ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = plot_states))
 ```
 
 ## Plot on a circle
@@ -169,6 +187,12 @@ ys <- sin(angdata[ts])*ts
 
 plot(xs,ys, col = states[ts]+1, pch = 20, ylab = "", yaxt = "n", xlab = "", xaxt = "n")
 abline(v = 0, h =0)
+```
+
+
+```{r}
+plot(angdata, main="", type="h", col = gray(.7))
+text(angdata, col=states+1, labels=states, cex=.9)
 ```
 
 
