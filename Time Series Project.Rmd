@@ -179,7 +179,21 @@ s=c(s_1, s_2, s_3, s_4, s_5)
 
 ```{r}
 plot(angdata[s], type = "h", col=gray(.7))
-text(angdata[s], col = 6*states[s], labels = states[s], cex=.9)
+text(angdata[s], col = states[s], labels = states[s], cex=.9)
+```
+
+```{r}
+ts <- which(angdata != "NaN")
+xs <- cos(angdata[ts])*ts
+ys <- sin(angdata[ts])*ts
+
+
+plot(xs,ys, col = states[ts]+1, pch = 20, ylab = "", yaxt = "n", xlab = "", xaxt = "n")
+abline(v = 0, h =0)
+#text(xs,ys, col = states[ts], labels = states[ts])
+
+
+
 ```
 
 

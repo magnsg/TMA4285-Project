@@ -159,11 +159,24 @@ plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(states))
 ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = states))
 ```
 
+## Plot on a circle
+
+```{r}
+ts <- which(angdata != "NaN")
+xs <- cos(angdata[ts])*ts
+ys <- sin(angdata[ts])*ts
+
+
+plot(xs,ys, col = states[ts]+1, pch = 20, ylab = "", yaxt = "n", xlab = "", xaxt = "n")
+abline(v = 0, h =0)
+```
+
+
 ## Plot the transition matrix
 
 ```{r}
-transmatrix <- matrix(nrow = 9,ncol = 9)
-for (i in 1:9){
+transmatrix <- matrix(nrow = numstates,ncol = numstates)
+for (i in 1:numstates){
   transmatrix[i,]<- final_fit@transition[[i]]@parameters$coefficients
 }
 transmatrix
