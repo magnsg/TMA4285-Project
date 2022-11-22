@@ -1,16 +1,13 @@
 ---
 title: "Time Series Project"
-author: "Erling F Steen"
-date: "2022-11-04"
+author: "Emma E Botten, Magnus S Grytten and Erling F Steen"
+date: "2022-11-19"
 output: pdf_document
-editor_options: 
-  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
 
 ```{r}
 library(R.matlab)
@@ -19,14 +16,16 @@ library(ggplot2)
 library(plot.matrix)
 ```
 
+## Read the cell data
+
 ```{r}
-data <- readMat("Mouse28-140313_BS0150_HMMready.mat")
+data <- readMat("~/Documents/Tidsrekker/Prosjekt/Mouse28-140313_BS0150_HMMready.mat")
 angdata <- as.vector(data$resampledAwakeHeadAngleData)
 # Transpose thet data so that there are 71 columns, one column for each cell, and 15243 rows, one for each time interval.
 celldata <- t(data$celldata)
 ```
 
-
+### Exclude cells that are less active than 100 times
 
 ```{r}
 # Exclude cells that are active less than 100 times overall 
@@ -34,26 +33,15 @@ col_idx = which(colSums(celldata)<100)
 celldata = celldata[,-col_idx]
 ```
 
-
-```{r}
-# Reduced to 59 cells
-dim(celldata)
-```
-
 ```{r}
 cell_data <- data.frame(celldata)
-
 # Response and list must be on list-form
-
 # Response has to be in a list
 res <- list()
-
 # List of families. One for each cell
 families <- list()
-
 # Number of columns(cells)
 n_cells <- ncol(cell_data)
-
 for (i in 1:n_cells) {
   form <- as.formula(paste(colnames(cell_data)[i], "~ 1",sep=""))
   res[[i]] = form
@@ -61,115 +49,164 @@ for (i in 1:n_cells) {
 }
 ```
 
+### Model selection 
+
+Try fit the model to different number of states
+
 ```{r}
-# Model with 5 states
-set.seed(123)
+set.seed(345)
 model5 <- depmix(response = res, nstates = 5, data= cell_data, family = families)
 fit5 <- fit(model5)
-summary(fit5)
-AIC(model5)
-```
-
-## Fit models with more than 5 states
-
-```{r, echo = TRUE, eval = FALSE}
-# Model with 8 states
+# 8 states
 model8 <- depmix(response = res, nstates = 8, data= cell_data, family = families)
 fit8 <- fit(model8)
-summary(fit8)
-AIC(model8)
-
-
-# Model with 12 states
-model12 <- depmix(response = res, nstates = 12, data= cell_data, family = families)
-fit12 <- fit(model12)
-summary(fit12)
-AIC(model12)
-
-
-# Model with 15 states
-model5 <- depmix(response = res, nstates = 15, data= cell_data, family = families)
-fit15 <- fit(model15)
-summary(fit15)
-AIC(model15)
 ```
 
-### Indices of each state
+```{r}
+# 12 states
+model9 <- depmix(response = res, nstates = 9, data= cell_data, family = families)
+fit9 <- fit(model9)
+```
+
+Det konvergerer ikke:
 
 ```{r}
-# States for all time intervals
-states = posterior(fit5)$state
-# Indices for which state is 1
-idx_state1 <- which(states == 1)
-idx_state2 <- which(states == 2)
-idx_state3 <- which(states == 3)
-idx_state4 <- which(states == 4)
-idx_state5 <- which(states == 5)
+# states
+# model12 <- depmix(response = res, nstates = 12, data= cell_data, family = families)
+# fit12 <- fit(model12)
+
+# model15 <- depmix(response = res, nstates = 12, data= cell_data, family = families)
+# fit15 <- fit(model15)
+```
+
+
+```{r}
+AIC(fit5)
+AIC(fit8)
+AIC(fit9)
+#AIC(fit13)
+#AIC(fit15)
+```
+
+### Choose the model with lowest AIC
+
+```{r}
+numstates = 9
+final_fit = fit9
+```
+
+
+```{r}
+# Use the model with lowest AIC
+states = posterior(final_fit)$state
+idx_1 = which(states==1)
+idx_state = c(list(idx_1))
+ang_state = c(list(na.omit(angdata[idx_1])))
+for (i in 2:numstates){
+  cur_idx <- which(states == i)
+  idx_state <- c(idx_state, list(cur_idx))
+  ang_state <- c(ang_state, list(na.omit(angdata[cur_idx])))
+}
+```
+
+
+
+```{r}
+statevar <- rep(0,numstates)
+for (i in 1:numstates){
+  statevar[i] <-var(angdata[idx_state[[i]]], na.rm = TRUE)
+}
+print(statevar)
+max_var_state <- which.max(statevar)
 ```
 
 ```{r}
 #Avrege for of  
-avg_state1 <- mean(angdata[idx_state1], na.rm = TRUE)
-avg_state2 <- mean(angdata[idx_state2], na.rm = TRUE)
-avg_state3 <- mean(angdata[idx_state3], na.rm = TRUE)
-avg_state4 <- mean(angdata[idx_state4], na.rm = TRUE)
-avg_state5 <- mean(angdata[idx_state5], na.rm = TRUE)
-avg <- c(avg_state1, avg_state2, avg_state3, avg_state4, avg_state5)
-```
-
-
-### Histogram over head direction for each state
-
-```{r}
-plot(angdata, main="", type="h", col = gray(.7))
-text(angdata, col=6*states-2, labels=states, cex=.9)
-```
-
-Difficult to see. Take a random sample of the angle data
-
-```{r}
-#  Don´t plot all head angles. Take a random sample. Easier to visualize
-s_1 = sample(idx_state1, 100)
-s_2 = sample(idx_state2, 100)
-s_3 = sample(idx_state3, 100)
-s_4 = sample(idx_state4, 100)
-s_5 = sample(idx_state5, 100)
-s=c(s_1, s_2, s_3, s_4, s_5)
-```
-
-```{r}
-plot(angdata[s], type = "h", col=gray(.7))
-text(angdata[s], col = 6*states[s], labels = states[s], cex=.9)
-```
-
-
-
-### Plotting the average head direction of each state
-
-```{r}
-
-## Plot of mean head
-avg
-plot(avg, type="h")
-```
-
-
-```{r}
-sum5 <- summary(fit5)
-
-transmatrix <- matrix(nrow = 5,ncol = 5)
-for (i in 1:5){
-  transmatrix[i,]<- fit5@transition[[i]]@parameters$coefficients
+mean_ang_state = rep(0, numstates)
+for (i in 1:numstates){
+  mean_ang_state[i] <- mean(angdata[idx_state[[i]]], na.rm = TRUE)
 }
-
-transmatrix
-#heatmap(t(transmatrix)[,nrow(transmatrix):1],Colv = NA, Rowv = NA)
-#plot(transmatrix)
-heatmap(transmatrix, Colv = NA, Rowv = NA, revC = TRUE)
-
-round(transmatrix,3)
-
-
+print(mean_ang_state)
 ```
 
+
+```{r}
+unsorted_states <- c(1:numstates)
+unsorted_states <- unsorted_states[!unsorted_states == max_var_state]
+sorted_states <- max_var_state
+for (i in 2:numstates){
+  cur_min <- which.min(mean_ang_state[unsorted_states])
+  sorted_states <- c(sorted_states, unsorted_states[cur_min])
+  unsorted_states <- unsorted_states[-cur_min]
+}
+print(sorted_states)
+```
+
+
+### Plot the head direction for each states
+
+```{r}
+idx <- as.vector(sapply(ang_state, length))
+ang = unlist(ang_state)
+states = c()
+for (i in 1:length(idx)) {
+  states = c(states, rep(i, idx[i]))
+}
+plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(states))
+```
+
+```{r}
+ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = states))
+```
+
+## Plot the transition matrix
+
+```{r}
+transmatrix <- matrix(nrow = 9,ncol = 9)
+for (i in 1:9){
+  transmatrix[i,]<- final_fit@transition[[i]]@parameters$coefficients
+}
+transmatrix
+heatmap(transmatrix[sorted_states,sorted_states], Colv = NA, Rowv = NA, revC = TRUE)
+```
+
+### Get the parameters
+
+```{r}
+u <- getpars(final_fit)
+loglam = u[which(names(u)=="(Intercept)")]
+lams = exp(unname(loglam))
+```
+
+### Bootstrapping
+
+
+Code from the book
+
+```{r}
+pois.HMM.generate_sample = function(n,m,lambda,Mtrans,StatDist=NULL){
+# n = data length, m = number of states, Mtrans = transition matrix, StatDist = stationary distn
+ if(is.null(StatDist)) StatDist = solve(t(diag(m)-Mtrans +1),rep(1,m))
+  mvect = 1:m
+  state = numeric(n)
+  state[1] = sample(mvect ,1, prob=StatDist)
+  for (i in 2:n)
+       state[i] = sample(mvect ,1,prob=Mtrans[state[i-1] ,])
+  y = rpois(n,lambda=lambda[state ])
+  list(y= y, state= state)   }
+```
+
+```{r}
+set.seed(10101101)
+nboot = 100
+nobs = nrow(celldata)
+para.star = matrix(NA, nrow=nboot, ncol = 6)
+for (j in 1:nboot){
+ x.star = pois.HMM.generate_sample(n=nobs, m=numstates, lambda=lams, Mtrans=transmatrix)$y
+ model <- depmix(x.star ~1, nstates=numstates, data=data.frame(x.star),
+family=poisson())
+u = as.vector(getpars(fit(model, verbose=0)))
+print(j)
+}
+```
 
