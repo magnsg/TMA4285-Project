@@ -19,7 +19,7 @@ library(plot.matrix)
 ## Read the cell data
 
 ```{r}
-data <- readMat("Mouse28-140313_BS0150_HMMready.mat")
+data <- readMat("~/Documents/Tidsrekker/Prosjekt/Mouse28-140313_BS0150_HMMready.mat")
 angdata <- as.vector(data$resampledAwakeHeadAngleData)
 # Transpose thet data so that there are 71 columns, one column for each cell, and 15243 rows, one for each time interval.
 celldata <- t(data$celldata)
@@ -33,10 +33,12 @@ col_idx = which(colSums(celldata)<100)
 celldata = celldata[,-col_idx]
 ```
 
+
 ```{r}
 cell_data <- data.frame(celldata)
 # Response and list must be on list-form
 # Response has to be in a list
+setup <- function(family){
 res <- list()
 # List of families. One for each cell
 families <- list()
@@ -45,20 +47,16 @@ n_cells <- ncol(cell_data)
 for (i in 1:n_cells) {
   form <- as.formula(paste(colnames(cell_data)[i], "~ 1",sep=""))
   res[[i]] = form
-  families[[i]] = poisson()
+  families[[i]] = family
 }
+return(list(families=families, res = res))
+}
+li <- setup(poisson())
+res = li$res
+families = li$families
 ```
 
-### Add noise to celldata
 
-```{r}
-#for (i in 1:n_cells){
-#  cell_data[[i]] <- jitter(cell_data[[i]])
-#  cell_data[[i]][cell_data[[i]] < 0] <- 0
-#  cell_data[[i]] <- round(cell_data[[i]],0)
-#}
-#cell_data
-```
 
 
 
@@ -74,27 +72,31 @@ fit5 <- fit(model5)
 model8 <- depmix(response = res, nstates = 8, data= cell_data, family = families)
 fit8 <- fit(model8)
 ```
+```{r}
+set.seed(15665)
+model6 <- depmix(response = res, nstates = 6, data= cell_data, family = families)
+fit6 <- fit(model6)
+
+model7 <- depmix(response = res, nstates = 7, data= cell_data, family = families)
+fit7<- fit(model7)
+```
+
 
 ```{r}
 # 12 states
+set.seed(1995)
 model9 <- depmix(response = res, nstates = 9, data= cell_data, family = families)
 fit9 <- fit(model9)
 ```
 
-Det konvergerer ikke:
 
-```{r}
-# states
-# model12 <- depmix(response = res, nstates = 12, data= cell_data, family = families)
-# fit12 <- fit(model12)
 
-# model15 <- depmix(response = res, nstates = 12, data= cell_data, family = families)
-# fit15 <- fit(model15)
-```
 
 
 ```{r}
 AIC(fit5)
+AIC(fit6)
+AIC(fit7)
 AIC(fit8)
 AIC(fit9)
 #AIC(fit13)
@@ -103,15 +105,12 @@ AIC(fit9)
 
 ### Choose the model with lowest AIC
 
-
 ```{r}
 numstates = 9
+final_fit = fit9
 ```
 
-```{r}
-final_model <- depmix(response = res, nstates = numstates, data= cell_data, family = families)
-final_fit <- fit(final_model)
-```
+
 
 
 ```{r}
@@ -138,6 +137,8 @@ print(statevar)
 max_var_state <- which.max(statevar)
 ```
 
+
+
 ```{r}
 #Avrege for of  
 mean_ang_state = rep(0, numstates)
@@ -146,6 +147,8 @@ for (i in 1:numstates){
 }
 print(mean_ang_state)
 ```
+
+
 
 
 ```{r}
@@ -161,89 +164,58 @@ print(sorted_states)
 ```
 
 
+```{r}
+ang_state = list()
+for (i in sorted_states){
+  cur_idx <- which(states == i)
+  ang_state <- c(ang_state, list(na.omit(angdata[cur_idx])))
+}
+```
+
+
+
+
 ### Plot the head direction for each states
 
 ```{r}
 idx <- as.vector(sapply(ang_state, length))
 ang = unlist(ang_state)
-plot_states = c()
-for (i in 1:length(idx)) {
-  plot_states = c(plot_states, rep(i, idx[i]))
+states = c()
+for (i in 1:9) {
+  states = c(states, rep(i, idx[i]))
 }
-plot_data = data.frame(ang = ang, x=1:length(ang), plot_states=as.factor(plot_states))
+plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(states))
+plot_data
 ```
 
 ```{r}
-ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = plot_states))
+head_plot <- ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = states)) + xlab("") + ylab("Head angle") + ggtitle("Head angles for sorted states")
+ggsave("headdirection.jpg", plot = head_plot)
 ```
 
-## Plot on a circle
-
 ```{r}
-ts <- which(angdata != "NaN")
-xs <- cos(angdata[ts])*ts
-ys <- sin(angdata[ts])*ts
-
-
+ts <- which(ang != "NaN")
+xs <- cos(ang[ts])*ts
+ys <- sin(ang[ts])*ts
 plot(xs,ys, col = states[ts]+1, pch = 20, ylab = "", yaxt = "n", xlab = "", xaxt = "n")
 abline(v = 0, h =0)
 ```
 
-
-```{r}
-plot(angdata, main="", type="h", col = gray(.7))
-text(angdata, col=states+1, labels=states, cex=.9)
-```
-
-
 ## Plot the transition matrix
 
+
+
 ```{r}
-transmatrix <- matrix(nrow = numstates,ncol = numstates)
-for (i in 1:numstates){
+transmatrix <- matrix(nrow = 9,ncol = 9)
+for (i in 1:9){
   transmatrix[i,]<- final_fit@transition[[i]]@parameters$coefficients
 }
-transmatrix
-heatmap(transmatrix[sorted_states,sorted_states], Colv = NA, Rowv = NA, revC = TRUE)
-```
-
-### Get the parameters
-
-```{r}
-u <- getpars(final_fit)
-loglam = u[which(names(u)=="(Intercept)")]
-lams = exp(unname(loglam))
-```
-
-### Bootstrapping
-
-
-Code from the book
-
-```{r}
-pois.HMM.generate_sample = function(n,m,lambda,Mtrans,StatDist=NULL){
-# n = data length, m = number of states, Mtrans = transition matrix, StatDist = stationary distn
- if(is.null(StatDist)) StatDist = solve(t(diag(m)-Mtrans +1),rep(1,m))
-  mvect = 1:m
-  state = numeric(n)
-  state[1] = sample(mvect ,1, prob=StatDist)
-  for (i in 2:n)
-       state[i] = sample(mvect ,1,prob=Mtrans[state[i-1] ,])
-  y = rpois(n,lambda=lambda[state ])
-  list(y= y, state= state)   }
+heatmap(transmatrix[sorted_states,sorted_states], Colv = NA, Rowv = NA, revC = TRUE, main = "Heatmap of Transition Matrix", xlab = "To States", ylab = "From States")
 ```
 
 ```{r}
-set.seed(10101101)
-nboot = 100
-nobs = nrow(celldata)
-para.star = matrix(NA, nrow=nboot, ncol = 6)
-for (j in 1:nboot){
- x.star = pois.HMM.generate_sample(n=nobs, m=numstates, lambda=lams, Mtrans=transmatrix)$y
- model <- depmix(x.star ~1, nstates=numstates, data=data.frame(x.star),
-family=poisson())
-u = as.vector(getpars(fit(model, verbose=0)))
-print(j)
-}
+summary(final_fit)
 ```
+
+
 
