@@ -19,7 +19,7 @@ library(plot.matrix)
 ## Read the cell data
 
 ```{r}
-data <- readMat("~/Documents/Tidsrekker/Prosjekt/Mouse28-140313_BS0150_HMMready.mat")
+data <- readMat("Mouse28-140313_BS0150_HMMready.mat")
 angdata <- as.vector(data$resampledAwakeHeadAngleData)
 # Transpose thet data so that there are 71 columns, one column for each cell, and 15243 rows, one for each time interval.
 celldata <- t(data$celldata)
@@ -180,25 +180,46 @@ for (i in sorted_states){
 ```{r}
 idx <- as.vector(sapply(ang_state, length))
 ang = unlist(ang_state)
-states = c()
+plot_states = c()
 for (i in 1:9) {
-  states = c(states, rep(i, idx[i]))
+  plot_states = c(plot_states, rep(i, idx[i]))
 }
-plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(states))
+plot_data = data.frame(ang = ang, x=1:length(ang), states=as.factor(plot_states))
 plot_data
 ```
 
 ```{r}
 head_plot <- ggplot(data = plot_data) + geom_point(aes(x = x, y=ang, col = states)) + xlab("") + ylab("Head angle") + ggtitle("Head angles for sorted states")
+print(head_plot)
 ggsave("headdirection.jpg", plot = head_plot)
 ```
 
 ```{r}
-ts <- which(ang != "NaN")
-xs <- cos(ang[ts])*ts
-ys <- sin(ang[ts])*ts
+ts <- which(angdata != "NaN")
+xs <- cos(angdata[ts])*ts
+ys <- sin(angdata[ts])*ts
 plot(xs,ys, col = states[ts]+1, pch = 20, ylab = "", yaxt = "n", xlab = "", xaxt = "n")
 abline(v = 0, h =0)
+```
+
+
+```{r}
+ordered_states <- rep(0,length(states))
+for (i in 1:length(states)){
+  ordered_states[i] <- which(sorted_states == states[i])
+}
+
+circ_plot_data <- data.frame(x = xs, y = ys, states = as.factor(ordered_states[ts]))
+circ_plot <- ggplot(data = circ_plot_data) + geom_point(aes(x=x, y=y, col = states)) + xlab("") +
+  ylab("") + ggtitle("All head angles") + 
+  theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()) +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+print(circ_plot)
+ggsave("circleheaddirection.jpg", plot = circ_plot)
 ```
 
 ## Plot the transition matrix
